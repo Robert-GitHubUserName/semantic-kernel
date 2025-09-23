@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}Browser Automation - AI Agent{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-globe"></i> Web Navigation
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="navigateForm">
+                    <div class="mb-3">
+                        <label for="url" class="form-label">URL</label>
+                        <input type="url" class="form-control" id="url"
+                               placeholder="https://example.com" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="navigateBtn">
+                        <i class="fas fa-arrow-right"></i> Navigate
+                    </button>
+                </form>
+
+                <div id="navigationResult" class="mt-3 result-container">
+                    <h6>Navigation Status:</h6>
+                    <div class="border rounded p-3 bg-light">
+                        <div id="navStatus">Ready to navigate</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-brain"></i> AI Web Task Planning
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="planTaskForm">
+                    <div class="mb-3">
+                        <label for="taskDescription" class="form-label">Task Description</label>
+                        <textarea class="form-control" id="taskDescription" rows="3"
+                                  placeholder="Describe the web automation task you want to perform..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success" id="planBtn">
+                        <i class="fas fa-lightbulb"></i> Plan Task
+                    </button>
+                </form>
+
+                <div id="planResult" class="mt-3 result-container">
+                    <h6>AI-Generated Plan:</h6>
+                    <div class="border rounded p-3 bg-light">
+                        <pre id="planContent"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-mouse-pointer"></i> Element Interaction
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="interactForm">
+                    <div class="mb-3">
+                        <label for="selector" class="form-label">CSS Selector</label>
+                        <input type="text" class="form-control" id="selector"
+                               placeholder="#button, .class, input[name='field']" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="action" class="form-label">Action</label>
+                        <select class="form-select" id="action" required>
+                            <option value="click">Click</option>
+                            <option value="type">Type Text</option>
+                            <option value="get_text">Get Text</option>
+                        </select>
+                    </div>
+                    <div class="mb-3 text-input-container" id="textInput">
+                        <label for="inputText" class="form-label">Text to Type</label>
+                        <input type="text" class="form-control" id="inputText"
+                               placeholder="Enter text to type...">
+                    </div>
+                    <button type="submit" class="btn btn-warning" id="interactBtn">
+                        <i class="fas fa-play"></i> Execute Action
+                    </button>
+                </form>
+
+                <div id="interactionResult" class="mt-3 result-container">
+                    <h6>Interaction Result:</h6>
+                    <div class="border rounded p-3 bg-light">
+                        <div id="interactionContent">Ready for interaction</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-camera"></i> Page Analysis
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-info" id="getContentBtn">
+                        <i class="fas fa-file-alt"></i> Get Page Content
+                    </button>
+                    <button class="btn btn-secondary" id="takeScreenshotBtn">
+                        <i class="fas fa-camera"></i> Take Screenshot
+                    </button>
+                </div>
+
+                <div id="contentResult" class="mt-3 result-container">
+                    <h6>Page Content:</h6>
+                    <div class="border rounded p-3 bg-light">
+                        <div id="pageContent">Content will appear here</div>
+                    </div>
+                </div>
+
+                <div id="screenshotResult" class="mt-3 result-container">
+                    <h6>Screenshot:</h6>
+                    <div class="border rounded p-3 bg-light text-center">
+                        <div id="screenshotStatus">Screenshot will appear here</div>
+                        <img id="screenshotImg" src="" alt="Screenshot" class="img-fluid mt-2 screenshot-hidden">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Automation Sequence -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-robot"></i> Automation Sequence
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Execute a complete automation sequence based on the AI-generated plan.</p>
+                <button class="btn btn-danger" id="executeSequenceBtn" disabled>
+                    <i class="fas fa-play-circle"></i> Execute Full Sequence
+                </button>
+                <div id="sequenceResult" class="mt-3 result-container">
+                    <h6>Sequence Execution:</h6>
+                    <div class="border rounded p-3 bg-light">
+                        <div id="sequenceLog">Generate a plan first, then execute the sequence</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const socket = io();
+
+    // Action selection handler
+    document.getElementById('action').addEventListener('change', function() {
+        const textInput = document.getElementById('textInput');
+        const action = this.value;
+        if (action === 'type') {
+            textInput.classList.remove('text-input-hidden');
+        } else {
+            textInput.classList.add('text-input-hidden');
+        }
+        document.getElementById('inputText').required = action === 'type';
+    });
+
+    // Navigation
+    document.getElementById('navigateForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const url = document.getElementById('url').value;
+
+        document.getElementById('navStatus').textContent = 'Navigating...';
+
+        fetch('/api/navigate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url: url})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('navStatus').textContent = `Successfully navigated to ${url}`;
+            } else {
+                document.getElementById('navStatus').textContent = 'Error: ' + data.error;
+            }
+        })
+        .catch(error => {
+            document.getElementById('navStatus').textContent = 'Error: ' + error.message;
+        });
+    });
+
+    // Task planning
+    document.getElementById('planTaskForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const task = document.getElementById('taskDescription').value;
+
+        fetch('/api/plan-web-task', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({task: task})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('planContent').textContent = data.plan;
+                document.getElementById('executeSequenceBtn').disabled = false;
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
+    });
+
+    // Element interaction
+    document.getElementById('interactForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const selector = document.getElementById('selector').value;
+        const action = document.getElementById('action').value;
+        const text = document.getElementById('inputText').value;
+
+        let endpoint, body;
+        switch(action) {
+            case 'click':
+                endpoint = '/api/interact';
+                body = {selector: selector, action: 'click'};
+                break;
+            case 'type':
+                endpoint = '/api/interact';
+                body = {selector: selector, action: 'type', text: text};
+                break;
+            case 'get_text':
+                endpoint = '/api/get-element-text';
+                body = {selector: selector};
+                break;
+        }
+
+        document.getElementById('interactionContent').textContent = 'Executing...';
+
+        fetch(endpoint, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (action === 'get_text') {
+                    document.getElementById('interactionContent').textContent = `Text: ${data.text}`;
+                } else {
+                    document.getElementById('interactionContent').textContent = 'Action completed successfully';
+                }
+            } else {
+                document.getElementById('interactionContent').textContent = 'Error: ' + data.error;
+            }
+        })
+        .catch(error => {
+            document.getElementById('interactionContent').textContent = 'Error: ' + error.message;
+        });
+    });
+
+    // Get page content
+    document.getElementById('getContentBtn').addEventListener('click', function() {
+        document.getElementById('pageContent').textContent = 'Loading...';
+
+        fetch('/api/get-page-content', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('pageContent').textContent = data.content.substring(0, 500) + '...';
+            } else {
+                document.getElementById('pageContent').textContent = 'Error: ' + data.error;
+            }
+        })
+        .catch(error => {
+            document.getElementById('pageContent').textContent = 'Error: ' + error.message;
+        });
+    });
+
+    // Take screenshot
+    document.getElementById('takeScreenshotBtn').addEventListener('click', function() {
+        document.getElementById('screenshotStatus').textContent = 'Taking screenshot...';
+
+        fetch('/api/take-screenshot', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({filename: 'web_screenshot.png'})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('screenshotStatus').textContent = `Screenshot saved as ${data.filename}`;
+                // In a real implementation, you'd serve the image
+                // document.getElementById('screenshotImg').src = `/static/screenshots/${data.filename}`;
+                // document.getElementById('screenshotImg').style.display = 'block';
+            } else {
+                document.getElementById('screenshotStatus').textContent = 'Error: ' + data.error;
+            }
+        })
+        .catch(error => {
+            document.getElementById('screenshotStatus').textContent = 'Error: ' + error.message;
+        });
+    });
+
+    // Execute sequence (placeholder)
+    document.getElementById('executeSequenceBtn').addEventListener('click', function() {
+        document.getElementById('sequenceLog').textContent = 'Executing automation sequence... (This is a placeholder - full implementation would parse and execute the plan)';
+        setTimeout(() => {
+            document.getElementById('sequenceLog').textContent = 'Sequence execution completed (simulated)';
+        }, 2000);
+    });
+
+    // Socket event handlers
+    socket.on('navigation_complete', function(data) {
+        document.getElementById('navStatus').textContent = `Navigated to ${data.url} (${data.content_length} chars)`;
+    });
+});
+</script>
+{% endblock %}

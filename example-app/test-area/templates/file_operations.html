@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}File Operations - AI Agent{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-alt"></i> File Analysis
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="analyzeForm">
+                    <div class="mb-3">
+                        <label for="filePath" class="form-label">File Path</label>
+                        <input type="text" class="form-control" id="filePath"
+                               placeholder="Enter file path (e.g., main.py)" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="analyzeBtn">
+                        <i class="fas fa-search"></i> Analyze File
+                    </button>
+                </form>
+
+                <div id="analysisResult" class="mt-3 result-container">
+                    <h6>Analysis Result:</h6>
+                    <div class="border rounded p-3 bg-light">
+                        <pre id="analysisContent"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-code"></i> Code Generation
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="codeGenForm">
+                    <div class="mb-3">
+                        <label for="codeDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="codeDescription" rows="3"
+                                  placeholder="Describe the code you want to generate..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success" id="generateBtn">
+                        <i class="fas fa-magic"></i> Generate Code
+                    </button>
+                </form>
+
+                <div id="codeResult" class="mt-3 result-container">
+                    <h6>Generated Code:</h6>
+                    <div class="border rounded p-3 bg-light">
+                        <pre id="codeContent"><code></code></pre>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary mt-2" onclick="copyCode()">
+                        <i class="fas fa-copy"></i> Copy Code
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-folder"></i> Directory Browser
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="listDirForm">
+                    <div class="mb-3">
+                        <label for="dirPath" class="form-label">Directory Path</label>
+                        <input type="text" class="form-control" id="dirPath"
+                               value="." placeholder="Enter directory path">
+                    </div>
+                    <button type="submit" class="btn btn-info" id="listBtn">
+                        <i class="fas fa-list"></i> List Contents
+                    </button>
+                </form>
+
+                <div id="dirResult" class="mt-3 result-container">
+                    <h6>Directory Contents:</h6>
+                    <div class="border rounded p-3 bg-light">
+                        <div id="dirContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-edit"></i> File Editor
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="readFileForm">
+                    <div class="mb-3">
+                        <label for="readFilePath" class="form-label">File Path</label>
+                        <input type="text" class="form-control" id="readFilePath"
+                               placeholder="Enter file path to read">
+                    </div>
+                    <button type="submit" class="btn btn-warning" id="readBtn">
+                        <i class="fas fa-book-open"></i> Read File
+                    </button>
+                </form>
+
+                <div id="fileContent" class="mt-3 result-container">
+                    <h6>File Content:</h6>
+                    <label for="fileText" class="form-label">Edit file content below:</label>
+                    <textarea class="form-control" id="fileText" rows="10" placeholder="File content will appear here for editing..."></textarea>
+                    <button class="btn btn-primary btn-sm mt-2" onclick="saveFile()">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const socket = io();
+
+    // File analysis
+    document.getElementById('analyzeForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const filePath = document.getElementById('filePath').value;
+
+        fetch('/api/analyze-file', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({file_path: filePath})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('analysisContent').textContent = data.result;
+                document.getElementById('analysisResult').style.display = 'block';
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
+    });
+
+    // Code generation
+    document.getElementById('codeGenForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const description = document.getElementById('codeDescription').value;
+
+        fetch('/api/generate-code', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({description: description})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('codeContent').textContent = data.result;
+                document.getElementById('codeResult').style.display = 'block';
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
+    });
+
+    // Directory listing
+    document.getElementById('listDirForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const path = document.getElementById('dirPath').value;
+
+        fetch('/api/list-directory', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path: path})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const content = data.files.map(file =>
+                    `<div><i class="fas ${file.type === 'directory' ? 'fa-folder' : 'fa-file'}"></i> ${file.name}</div>`
+                ).join('');
+                document.getElementById('dirContent').innerHTML = content;
+                document.getElementById('dirResult').style.display = 'block';
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
+    });
+
+    // File reading
+    document.getElementById('readFileForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const filePath = document.getElementById('readFilePath').value;
+
+        fetch('/api/read-file', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({file_path: filePath})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('fileText').value = data.content;
+                document.getElementById('fileContent').style.display = 'block';
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
+    });
+});
+
+// Copy code to clipboard
+function copyCode() {
+    const code = document.getElementById('codeContent').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        alert('Code copied to clipboard!');
+    });
+}
+
+// Save file changes
+function saveFile() {
+    const filePath = document.getElementById('readFilePath').value;
+    const content = document.getElementById('fileText').value;
+
+    fetch('/api/write-file', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({file_path: filePath, content: content})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('File saved successfully!');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => alert('Error: ' + error.message));
+}
+</script>
+{% endblock %}
