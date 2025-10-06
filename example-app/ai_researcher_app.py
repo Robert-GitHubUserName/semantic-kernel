@@ -41,6 +41,12 @@ try:
 except ImportError:
     HAS_BEAUTIFULSOUP = False
 
+try:
+    from playwright.sync_api import sync_playwright
+    HAS_PLAYWRIGHT = True
+except ImportError:
+    HAS_PLAYWRIGHT = False
+
 
 @vectorstoremodel
 @dataclass
@@ -285,6 +291,194 @@ class FileManager:
     def get_current_directory(self) -> str:
         """Get the current working directory."""
         return str(self.current_path)
+
+    def scrape_webpage(self, url: str) -> Dict:
+        """Scrape content from a webpage."""
+        try:
+            # Validate URL format
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+
+            # Set up headers to mimic a real browser
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+
+            # Fetch the webpage
+            response = requests.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+
+            # Extract content
+            if HAS_BEAUTIFULSOUP:
+                soup = BeautifulSoup(response.content, 'html.parser')
+
+                # Remove script and style elements
+                for script in soup(["script", "style"]):
+                    script.decompose()
+
+                # Get text content
+                text_content = soup.get_text(separator='\n', strip=True)
+
+                # Extract title
+                title = soup.title.string if soup.title else "No title found"
+
+                # Try to find main content areas
+                main_content = ""
+                content_selectors = ['main', 'article', '.content', '#content', '.post', '.entry', '.main-content']
+
+                for selector in content_selectors:
+                    content_elem = soup.select_one(selector)
+                    if content_elem:
+                        main_content = content_elem.get_text(separator='\n', strip=True)
+                        break
+
+                if not main_content:
+                    # Fallback to body text
+                    body = soup.find('body')
+                    main_content = body.get_text(separator='\n', strip=True) if body else text_content
+
+                # Clean up the content
+                lines = [line.strip() for line in main_content.split('\n') if line.strip()]
+                clean_content = '\n'.join(lines[:100])  # Limit to first 100 lines for documents
+
+                return {
+                    "success": True,
+                    "url": url,
+                    "title": title,
+                    "content": clean_content,
+                    "full_text": text_content
+                }
+            else:
+                return {"error": "BeautifulSoup not available for web scraping"}
+
+        except Exception as e:
+            return {"error": f"Failed to scrape webpage: {str(e)}"}
+
+    def take_webpage_screenshot(self, url: str, filename: str = None) -> Dict:
+        """Take a screenshot of a webpage and save it to the data folder using Playwright."""
+        try:
+            if not HAS_PLAYWRIGHT:
+                return {"error": "Playwright not available for screenshot capture"}
+
+            # Validate URL format
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+
+            # Generate filename if not provided
+            if not filename:
+                # Create a safe filename from URL
+                from urllib.parse import urlparse
+                parsed_url = urlparse(url)
+                domain = parsed_url.netloc.replace('www.', '').replace('.', '_')
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"{domain}_{timestamp}.png"
+
+            # Ensure .png extension
+            if not filename.lower().endswith('.png'):
+                filename += '.png'
+
+            # Create data directory if it doesn't exist (relative to base_path)
+            data_dir = self.base_path / "example-app" / "data"
+            data_dir.mkdir(parents=True, exist_ok=True)
+
+            screenshot_path = data_dir / filename
+
+            # Use Playwright to take screenshot
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                )
+                page = context.new_page()
+
+                try:
+                    # Navigate to the page
+                    page.goto(url, wait_until='networkidle', timeout=30000)
+
+                    # Wait a bit for dynamic content
+                    page.wait_for_timeout(2000)
+
+                    # Take screenshot
+                    page.screenshot(path=str(screenshot_path), full_page=True)
+
+                    return {
+                        "success": True,
+                        "url": url,
+                        "screenshot_path": str(screenshot_path),
+                        "filename": filename
+                    }
+
+                finally:
+                    browser.close()
+
+        except Exception as e:
+            return {"error": f"Failed to take screenshot: {str(e)}"}
+
+    def create_document_from_web(self, urls: List[str], title: str = None) -> Dict:
+        """Create a comprehensive document from multiple web pages with screenshots."""
+        try:
+            if not urls:
+                return {"error": "No URLs provided"}
+
+            # Generate title if not provided
+            if not title:
+                title = f"Web Research Document - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+
+            document_content = f"# {title}\n\n"
+            document_content += f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            document_content += f"Source URLs: {', '.join(urls)}\n\n"
+            document_content += "---\n\n"
+
+            screenshots_taken = []
+
+            for i, url in enumerate(urls, 1):
+                document_content += f"## Source {i}: {url}\n\n"
+
+                # Scrape webpage content
+                scrape_result = self.scrape_webpage(url)
+                if scrape_result.get("success"):
+                    document_content += f"### Title: {scrape_result['title']}\n\n"
+                    document_content += "### Content:\n\n"
+                    document_content += scrape_result['content']
+                    document_content += "\n\n"
+                else:
+                    document_content += f"### Error scraping content: {scrape_result.get('error', 'Unknown error')}\n\n"
+
+                # Take screenshot
+                screenshot_filename = f"{title.replace(' ', '_').replace('-', '_')}_source_{i}.png"
+                screenshot_result = self.take_webpage_screenshot(url, screenshot_filename)
+                if screenshot_result.get("success"):
+                    screenshots_taken.append(screenshot_result['filename'])
+                    document_content += f"### Screenshot: {screenshot_result['filename']}\n\n"
+                    document_content += f"![Screenshot {i}](data/{screenshot_result['filename']})\n\n"
+                else:
+                    document_content += f"### Screenshot Error: {screenshot_result.get('error', 'Unknown error')}\n\n"
+
+                document_content += "---\n\n"
+
+            # Save the document
+            filename = f"{title.replace(' ', '_').replace('-', '_')}.md"
+            doc_path = self.current_path / filename
+
+            with open(doc_path, 'w', encoding='utf-8') as f:
+                f.write(document_content)
+
+            return {
+                "success": True,
+                "document_path": str(doc_path),
+                "filename": filename,
+                "screenshots": screenshots_taken,
+                "urls_processed": len(urls)
+            }
+
+        except Exception as e:
+            return {"error": f"Failed to create document: {str(e)}"}
 
 
 class AIAssistant:
@@ -1149,6 +1343,43 @@ def fetch_webpage_content():
 
     except Exception as e:
         print(f"Webpage fetch error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/research/create-document', methods=['POST'])
+def create_research_document():
+    """Create a document from web research with scraped content and screenshots."""
+    try:
+        data = request.get_json()
+        urls = data.get('urls', [])
+        title = data.get('title', None)
+
+        if not urls:
+            return jsonify({'error': 'No URLs provided'}), 400
+
+        # Ensure urls is a list
+        if isinstance(urls, str):
+            urls = [urls]
+
+        print(f"Creating document from {len(urls)} URLs...")
+
+        # Use the FileManager method to create the document
+        result = file_manager.create_document_from_web(urls, title)
+
+        if result.get('error'):
+            return jsonify({'error': result['error']}), 500
+
+        return jsonify({
+            'success': True,
+            'document_path': result['document_path'],
+            'filename': result['filename'],
+            'screenshots': result['screenshots'],
+            'urls_processed': result['urls_processed'],
+            'message': f"Document created successfully with {len(result['screenshots'])} screenshots"
+        })
+
+    except Exception as e:
+        print(f"Document creation error: {e}")
         return jsonify({'error': str(e)}), 500
 
 
