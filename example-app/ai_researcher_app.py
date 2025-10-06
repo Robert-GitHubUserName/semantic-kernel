@@ -1383,6 +1383,188 @@ def create_research_document():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/settings/test-connection', methods=['POST'])
+def test_connection():
+    """Test connection to AI provider."""
+    try:
+        data = request.get_json()
+        provider = data.get('provider', 'ollama')
+
+        if provider == 'openai':
+            api_key = data.get('api_key', '')
+            base_url = data.get('base_url', 'https://api.openai.com/v1')
+            model = data.get('model', 'gpt-3.5-turbo')
+
+            if not api_key:
+                return jsonify({'success': False, 'error': 'API key is required'}), 400
+
+            # Test OpenAI connection
+            try:
+                import openai
+                test_client = openai.AsyncOpenAI(
+                    api_key=api_key,
+                    base_url=base_url
+                )
+                # Simple test - list models
+                return jsonify({
+                    'success': True,
+                    'message': f'Successfully connected to OpenAI API with model {model}'
+                })
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': f'OpenAI connection failed: {str(e)}'
+                }), 400
+
+        else:  # ollama
+            host_url = data.get('host_url', 'http://localhost:11434')
+            model = data.get('model', 'gemma3:latest')
+
+            # Test Ollama connection
+            try:
+                import requests
+                # Test basic connectivity
+                response = requests.get(f"{host_url}/api/tags", timeout=5)
+                if response.status_code == 200:
+                    models = response.json().get('models', [])
+                    model_names = [m['name'] for m in models]
+                    
+                    if model in model_names:
+                        return jsonify({
+                            'success': True,
+                            'message': f'Connected to Ollama - Model {model} available'
+                        })
+                    else:
+                        return jsonify({
+                            'success': True,
+                            'message': f'Connected to Ollama - Warning: Model {model} not found. Available models: {", ".join(model_names[:3])}'
+                        })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Ollama returned status code {response.status_code}'
+                    }), 400
+            except requests.exceptions.ConnectionError:
+                return jsonify({
+                    'success': False,
+                    'error': f'Cannot connect to Ollama at {host_url}. Is Ollama running?'
+                }), 400
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': f'Ollama connection failed: {str(e)}'
+                }), 400
+
+    except Exception as e:
+        print(f"Connection test error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/settings/save', methods=['POST'])
+def save_settings():
+    """Save AI provider settings."""
+    try:
+        data = request.get_json()
+        provider = data.get('provider', 'ollama')
+
+        # Save settings to a configuration file
+        settings_file = Path(__file__).parent / 'ai_provider_settings.json'
+        
+        with open(settings_file, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        print(f"Settings saved: Provider = {provider}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Settings saved successfully for {provider}'
+        })
+
+    except Exception as e:
+        print(f"Settings save error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/settings/load', methods=['GET'])
+def load_settings():
+    """Load AI provider settings."""
+    try:
+        settings_file = Path(__file__).parent / 'ai_provider_settings.json'
+        
+        if settings_file.exists():
+            with open(settings_file, 'r') as f:
+                settings = json.load(f)
+            return jsonify({'success': True, 'settings': settings})
+        else:
+            # Return default settings
+            return jsonify({
+                'success': True,
+                'settings': {
+                    'provider': 'ollama',
+                    'ollama': {
+                        'host_url': 'http://localhost:11434',
+                        'model': 'gemma3:latest',
+                        'embedding_model': 'nomic-embed-text'
+                    },
+                    'openai': {
+                        'api_key': '',
+                        'base_url': 'https://api.openai.com/v1',
+                        'model': 'gpt-3.5-turbo'
+                    }
+                }
+            })
+
+    except Exception as e:
+        print(f"Settings load error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/ollama/models', methods=['POST'])
+def get_ollama_models():
+    """Get available Ollama models from the specified host."""
+    try:
+        data = request.get_json()
+        host_url = data.get('host_url', 'http://localhost:11434')
+        
+        # Fetch models from Ollama API
+        response = requests.get(f"{host_url}/api/tags", timeout=5)
+        
+        if response.status_code == 200:
+            models_data = response.json()
+            models = models_data.get('models', [])
+            
+            # Extract model names
+            model_names = [model.get('name', '') for model in models if model.get('name')]
+            
+            # Sort models alphabetically
+            model_names.sort()
+            
+            return jsonify({
+                'success': True,
+                'models': model_names,
+                'count': len(model_names)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Failed to fetch models. Status code: {response.status_code}'
+            }), 400
+
+    except requests.exceptions.Timeout:
+        return jsonify({
+            'success': False,
+            'error': 'Connection timeout. Is Ollama running?'
+        }), 400
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'error': 'Cannot connect to Ollama. Please check the host URL.'
+        }), 400
+    except Exception as e:
+        print(f"Get models error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection."""

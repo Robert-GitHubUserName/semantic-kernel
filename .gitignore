@@ -213,3 +213,6 @@ htmlcov/
 # Local development
 .local/
 debug.log
+
+# AI Provider Settings (contains API keys)
+example-app/ai_provider_settings.json
